@@ -1,49 +1,51 @@
-# Claude Code Hooks Analysis - Comprehensive Report
+# Claude Code Hooks Analysis - Design Reference
 
-## I. The 4 Hooks Implemented in Claude Parallel Workers
+This document describes the hook architecture planned for Claude Parallel Workers.
+
+## I. The 4-Hook Design
 
 ### 1. **UserPromptSubmit**
-**Location**: Called when user submits a prompt to Claude Code
-**Responsibilities**:
+**Location**: Fires when user submits a prompt to Claude Code
+**Planned Responsibilities**:
 - Detect parallelizable task patterns from user input
 - Create execution plan with task dependencies
 - Spawn orchestrator process (detached)
 - Generate and set unique run ID
 - Return initial status to stdout for context injection
 
-**Example Use Case**: 
+**Example Scenario**:
 ```
 User: "Analyze security vulnerabilities in login.py, auth.py, and session.py"
-→ Hook detects 3-file analysis pattern
-→ Spawns W1, W2, W3 workers
-→ Returns: "Analyzing 3 files in parallel (Run R42)"
+→ Hook would detect 3-file analysis pattern
+→ Would spawn W1, W2, W3 workers
+→ Would return: "Analyzing 3 files in parallel (Run R42)"
 ```
 
 ### 2. **PostToolUse**
-**Location**: Called after each tool execution (Read, Write, Bash, etc.)
-**Responsibilities**:
+**Location**: Fires after each tool execution (Read, Write, Bash, etc.)
+**Planned Responsibilities**:
 - Read worker progress from events.jsonl
 - Compute current status snapshot
 - Generate compact status line
 - Inject status as additional context to conductor
 
-**Example Status Injection**:
+**Example Output**:
 ```
 R42 — W1 80% processing; W2 ✓ done; W3 45% analyzing
 ```
 
 ### 3. **PreToolUse**
-**Location**: Called before each tool use (Read, Write, Bash, etc.)
-**Responsibilities**:
+**Location**: Fires before each tool use (Read, Write, Bash, etc.)
+**Planned Responsibilities**:
 - Detect merge/combine operations
 - Check if all dependencies are satisfied
 - Rewrite tool inputs with actual artifact paths
 - Block execution if workers aren't ready (exit code 2)
 
-**Example Rewrite Pattern**:
+**Example Transformation**:
 ```
 Original input: merge_reports(report_a, report_b, report_c)
-↓ (PreToolUse rewrites to)
+↓ (Hook would transform to)
 merge_reports(
   workers/W1/out/vulnerabilities.json,
   workers/W2/out/vulnerabilities.json,
@@ -52,8 +54,8 @@ merge_reports(
 ```
 
 ### 4. **Stop**
-**Location**: Called when conductor attempts to end the session
-**Responsibilities**:
+**Location**: Fires when conductor attempts to end the session
+**Planned Responsibilities**:
 - Check all worker completion status
 - Block termination if workers are pending (exit code 2)
 - Allow graceful termination when all workers complete
@@ -310,20 +312,31 @@ or
 
 ---
 
-## X. Key Implementation Files
+## X. Project Files & Status
 
+**Implemented**:
+```
+/home/user/claude-parallel-workers/shared/
+├── models.py              ← EventType, WorkerState, Plan (✓ complete)
+├── utils.py               ← Hook utilities (✓ complete)
+├── event_store.py         ← JSONL-based storage (✓ complete)
+└── event_store_v2.py      ← SQLite coordination (✓ complete)
+```
+
+**Planned (not yet implemented)**:
 ```
 /home/user/claude-parallel-workers/
 ├── hooks/
-│   ├── user_prompt_submit.py  ← Spawn point
-│   ├── post_tool_use.py       ← Status injection
-│   ├── pre_tool_use.py        ← Merge coordination
-│   └── stop.py                ← Completion gating
-├── shared/
-│   ├── models.py              ← EventType, WorkerState, Plan
-│   ├── utils.py               ← Hook utilities
-│   └── event_store_v2.py      ← SQLite coordination
-└── orchestrator/
-    └── orchestrator.py        ← Spawned by UserPromptSubmit
+│   ├── user_prompt_submit.py  ← Planned: Spawn point
+│   ├── post_tool_use.py       ← Planned: Status injection
+│   ├── pre_tool_use.py        ← Planned: Merge coordination
+│   └── stop.py                ← Planned: Completion gating
+├── orchestrator/
+│   ├── orchestrator.py        ← Planned: Spawned by UserPromptSubmit
+│   ├── task_parser.py         ← Planned: Pattern detection
+│   └── worker_manager.py      ← Planned: Worker lifecycle
+└── worker/
+    ├── worker.py              ← Planned: Task execution
+    └── task_executor.py       ← Planned: Execution framework
 ```
 

@@ -1,0 +1,39 @@
+# Example task definitions for parallel execution
+# This demonstrates dependency resolution and batch execution
+
+tasks:
+  # Batch 1: Independent tasks that can run in parallel
+  - name: "analyze-auth"
+    command: "echo 'Analyzing authentication module...' && sleep 2 && echo 'Auth analysis complete'"
+    prompt: "Analyze the authentication module for security vulnerabilities"
+    timeout: 60
+
+  - name: "analyze-api"
+    command: "echo 'Analyzing API endpoints...' && sleep 2 && echo 'API analysis complete'"
+    prompt: "Review API endpoints for proper validation"
+    timeout: 60
+
+  - name: "analyze-database"
+    command: "echo 'Analyzing database queries...' && sleep 2 && echo 'Database analysis complete'"
+    prompt: "Check database queries for SQL injection risks"
+    timeout: 60
+
+  # Batch 2: Tasks that depend on Batch 1
+  - name: "security-report"
+    command: "echo 'Generating security report...' && sleep 1 && echo 'Security report generated'"
+    prompt: "Generate comprehensive security report from all analyses"
+    dependencies: ["analyze-auth", "analyze-api", "analyze-database"]
+    timeout: 60
+
+  - name: "fix-critical"
+    command: "echo 'Fixing critical issues...' && sleep 1 && echo 'Critical fixes applied'"
+    prompt: "Apply fixes for critical security issues found"
+    dependencies: ["analyze-auth", "analyze-api"]
+    timeout: 60
+
+  # Batch 3: Final task
+  - name: "final-review"
+    command: "echo 'Performing final review...' && sleep 1 && echo 'Review complete'"
+    prompt: "Review all changes and generate summary"
+    dependencies: ["security-report", "fix-critical"]
+    timeout: 60

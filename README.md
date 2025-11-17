@@ -2,6 +2,23 @@
 
 A parallel execution framework for Claude Code that enables true concurrency through the native hooks system. Spawn and coordinate multiple worker processes while maintaining a single, responsive Claude session.
 
+## 📊 Implementation Status
+
+**✅ IMPLEMENTED (Working Code):**
+- SQLite event store with ACID guarantees (`shared/event_store_v2.py`)
+- Data models and event types (`shared/models.py`)
+- Orchestrator with asyncio-based parallel execution (`orchestrator/orchestrator.py`)
+- Worker process implementation (`worker/worker.py`)
+- All 4 hooks: UserPromptSubmit, PostToolUse, PreToolUse, Stop
+- YAML task definitions with dependency resolution
+- Integration tests and examples
+
+**🚧 PARTIAL:**
+- Hook integration (hooks are implemented but need testing with Claude Code)
+- Pattern detection (basic implementation, can be enhanced)
+
+**Architecture Pattern:** Combines ZO's asyncio.gather parallelism with SQLite state management for robustness.
+
 ## 🎯 Purpose
 
 Enable Claude Code to:
@@ -135,6 +152,40 @@ claude-parallel-hooks/
 └── examples/           # Usage examples and patterns
 ```
 
+## ⚙️ How Parallel Coordination Works
+
+The implementation uses a **two-level parallelism pattern**:
+
+### Level 1: Batch Sequencing (Sequential)
+Tasks are organized into batches based on dependencies. Batch N+1 waits for Batch N to complete.
+
+### Level 2: Within-Batch Parallelism (Concurrent)
+Tasks within a batch have no inter-dependencies and execute simultaneously using `asyncio.gather()`.
+
+**Example:**
+```yaml
+tasks:
+  - name: "A"           # Batch 1 (parallel)
+  - name: "B"           # Batch 1 (parallel)
+  - name: "C"           # Batch 1 (parallel)
+    dependencies: []
+
+  - name: "D"           # Batch 2 (parallel, waits for Batch 1)
+    dependencies: ["A"]
+  - name: "E"           # Batch 2 (parallel, waits for Batch 1)
+    dependencies: ["B"]
+
+  - name: "F"           # Batch 3 (waits for Batch 2)
+    dependencies: ["D", "E"]
+```
+
+**Coordination Mechanisms:**
+1. **SQLite Event Store** - ACID-compliant state tracking
+2. **Worker State Machine** - idle → busy → done/error
+3. **Heartbeats** - Detect dead workers (stale heartbeat = deadlock)
+4. **Time-limited Blocks** - Hooks can block operations with automatic expiry
+5. **Artifact Tracking** - Workers report output files for downstream tasks
+
 ## 🔧 Configuration
 
 ### Supported Patterns
@@ -170,15 +221,17 @@ Workers emit events to coordinate execution:
 
 ## 🧪 Testing
 
-Run tests:
+Run the integration test:
 ```bash
-pytest tests/
+python examples/test_orchestrator.py
 ```
 
-Run integration tests:
-```bash
-python tests/integration_test.py
-```
+This will execute the example tasks in `examples/tasks.yaml`, demonstrating:
+- Dependency resolution (topological sort)
+- Parallel execution within batches
+- Sequential execution across batches
+- SQLite event tracking
+- Worker state management
 
 ## 🤝 Contributing
 

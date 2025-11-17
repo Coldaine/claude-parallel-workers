@@ -1,14 +1,11 @@
-# Claude Parallel Hooks Requirements
+# Claude Parallel Hooks - Dependencies
 
-# Core dependencies
-typing-extensions>=4.0.0
+# YAML parsing for task definitions
+pyyaml>=6.0
 
-# Testing
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
-pytest-mock>=3.10.0
-
-# Development
-black>=23.0.0
-pylint>=2.15.0
-mypy>=1.0.0
+# No other dependencies required!
+# The implementation uses only Python standard library:
+# - asyncio (parallel execution)
+# - sqlite3 (event store)
+# - subprocess (worker processes)
+# - pathlib (file operations)

@@ -1,14 +1,16 @@
 # Claude Parallel Hooks
 
-A parallel execution framework for Claude Code that enables true concurrency through the native hooks system. Spawn and coordinate multiple worker processes while maintaining a single, responsive Claude session.
+An experimental framework exploring parallel execution patterns in Claude Code using the native hooks system. Demonstrates how hooks can coordinate multiple worker processes while maintaining a responsive Claude session.
+
+**Status**: Foundation-stage implementation. Core data models and event storage are functional; hook implementations and orchestrator are not yet implemented.
 
 ## 🎯 Purpose
 
-Enable Claude Code to:
-- **Detect parallelizable tasks** automatically from user prompts
-- **Spawn external workers** for true concurrent execution
-- **Synchronize state** using hooks and a lightweight event log
-- **Maintain responsiveness** without blocking on long-running operations
+This project explores how Claude Code could:
+- Detect parallelizable task patterns from user prompts
+- Spawn and coordinate external worker processes
+- Synchronize state using hooks and event logs
+- Coordinate results back into the Claude session
 
 ## 🏗️ Architecture
 
@@ -32,14 +34,14 @@ User → Claude Code Session
                             └── artifacts/
 ```
 
-## 🚀 Quick Start
+## 🚀 Installation Status
 
-### Installation
+**Note**: This project is in foundation stage. The architecture and data models are complete and functional, but hook implementations are not yet available. The following instructions document the planned configuration:
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/claude-parallel-hooks
-cd claude-parallel-hooks
+git clone https://github.com/Coldaine/claude-parallel-workers
+cd claude-parallel-workers
 ```
 
 2. Install dependencies:
@@ -47,12 +49,7 @@ cd claude-parallel-hooks
 uv sync
 ```
 
-3. Install hooks in Claude Code settings:
-```bash
-./settings/install.sh
-```
-
-Or manually add to `~/.claude/settings.json`:
+3. When hook implementations are available, they would be configured in `~/.claude/settings.json`:
 ```json
 {
   "hooks": {
@@ -86,98 +83,133 @@ Or manually add to `~/.claude/settings.json`:
 }
 ```
 
-## 📖 How It Works
+## 📖 Planned Architecture
+
+The framework is designed to work through four hook points in the Claude Code lifecycle:
 
 ### 1. Task Detection (UserPromptSubmit)
-When you submit a prompt like "Process files A, B, and C", the hook:
-- Detects the parallel pattern
-- Creates an execution plan
-- Spawns worker processes
-- Injects status into Claude's context
+When user submits a prompt like "Process files A, B, and C", this hook would:
+- Detect the parallel task pattern
+- Create an execution plan
+- Spawn worker processes
+- Provide initial context about the operation
 
 ### 2. Status Updates (PostToolUse)
-After each tool use, the hook:
-- Reads worker progress from `events.jsonl`
-- Generates a status line: `"R42 — W1 80% processing; W2 ✓ done; W3 waiting"`
-- Injects it as additional context
+After each tool execution, this hook would:
+- Read worker progress from the event store
+- Generate a status line: `"R42 — W1 80% processing; W2 ✓ done; W3 waiting"`
+- Inject status as additional context
 
 ### 3. Merge Coordination (PreToolUse)
-When Claude attempts to merge results, the hook:
-- Checks if all dependencies are satisfied
-- Rewrites tool inputs with actual artifact paths
-- Or blocks execution if workers aren't ready
+When Claude attempts merge operations, this hook would:
+- Check if all dependencies are satisfied
+- Rewrite tool inputs with actual artifact paths
+- Block execution if workers are still running
 
 ### 4. Completion Gating (Stop)
-Before Claude ends the session, the hook:
-- Verifies all workers have completed
-- Blocks termination if work is pending
-- Ensures no orphaned processes
+Before session termination, this hook would:
+- Verify all workers have completed
+- Block termination if work is pending
+- Ensure no orphaned processes
 
 ## 📁 Project Structure
 
+**Implemented**:
 ```
-claude-parallel-hooks/
-├── hooks/                  # Hook implementations
-│   ├── user_prompt_submit.py
-│   ├── pre_tool_use.py
-│   ├── post_tool_use.py
-│   └── stop.py
-├── orchestrator/          # Task planning and worker management
-│   ├── orchestrator.py
-│   ├── task_parser.py
-│   └── worker_manager.py
-├── worker/               # Worker process implementation
-│   ├── worker.py
-│   └── task_executor.py
-├── shared/              # Shared components and models
-│   ├── event_store.py
-│   └── models.py
-└── examples/           # Usage examples and patterns
+shared/
+├── models.py           # Data models (Event, Task, Plan, Worker, Status)
+├── event_store.py      # JSONL-based event logging
+├── event_store_v2.py   # SQLite-based event storage
+├── utils.py            # Hook utilities and helpers
+└── __init__.py
 ```
 
-## 🔧 Configuration
+**Planned (not yet implemented)**:
+```
+hooks/                  # Hook implementations
+├── user_prompt_submit.py
+├── pre_tool_use.py
+├── post_tool_use.py
+└── stop.py
+orchestrator/          # Task planning and worker management
+├── orchestrator.py
+├── task_parser.py
+└── worker_manager.py
+worker/               # Worker process implementation
+├── worker.py
+└── task_executor.py
+examples/           # Usage examples and patterns
+tests/              # Test suite
+```
 
-### Supported Patterns
-
-The system automatically detects parallelizable patterns like:
-- "Process files A, B, and C"
-- "Run tests on modules X, Y, and Z"
-- "Analyze documents 1 through 10"
-- "Generate reports for Q1, Q2, Q3, Q4"
+## 🔧 Data Model
 
 ### Event Types
 
-Workers emit events to coordinate execution:
+The system defines the following event types for worker coordination:
 - `start` - Task execution begins
 - `progress` - Progress updates (with percentage)
 - `artifact` - Output file created
 - `error` - Failure occurred
 - `done` - Task completed successfully
+- `merge_ready` - Results ready for merging
 
-## 📊 Example Usage
+### State Models
+
+The framework provides models for:
+- **Event**: Individual state change in the system
+- **Task**: Work unit with dependencies and inputs/outputs
+- **Worker**: Process with ID, task assignment, and state tracking
+- **Plan**: Execution graph with all tasks and worker assignments
+- **Status**: Current snapshot of all workers and blocking state
+
+## 📊 Data Model Example
 
 ```python
-# User prompt: "Analyze these three datasets: sales.csv, customers.csv, inventory.csv"
+from shared.models import Event, EventType, Task, Plan, Worker, WorkerState
+from shared.event_store import EventStore
 
-# System automatically:
-# 1. Detects three parallel tasks
-# 2. Creates execution plan
-# 3. Spawns three workers
-# 4. Each worker processes one file
-# 5. Injects status updates
-# 6. Merges results when complete
+# Create a task
+task = Task(
+    id="task_1",
+    description="Analyze sales.csv",
+    deps=[],  # No dependencies
+    inputs={"file": "sales.csv"},
+    outputs={"report": "analysis_report.json"}
+)
+
+# Create a worker assignment
+worker = Worker(
+    id="W1",
+    task="task_1",
+    cmd=["python", "worker.py", "--task", "task_1"],
+    state=WorkerState.INIT
+)
+
+# Log an event
+store = EventStore(".claude/runs/R42/")
+event = Event(
+    t=EventType.DONE,
+    ts="2025-11-13T12:00:00Z",
+    w="W1",
+    task="task_1",
+    path="results/analysis_report.json"
+)
+store.append_event(event)
 ```
+
+**When hooks are implemented**, the system would handle user prompts like:
+- "Analyze these three datasets: sales.csv, customers.csv, inventory.csv"
+- "Run tests on modules X, Y, and Z"
+- "Process files A, B, and C in parallel"
 
 ## 🧪 Testing
 
-Run tests:
+Test suite is planned but not yet implemented. To verify the current data models work:
 ```bash
-pytest tests/
-```
-
-Run integration tests:
-```bash
-python tests/integration_test.py
+python3 -c "from shared.models import Event, EventType; print('Models import successful')"
+python3 -c "from shared.event_store import EventStore; print('EventStore import successful')"
+python3 -c "from shared.event_store_v2 import EventStoreV2; print('EventStoreV2 import successful')"
 ```
 
 ## 🤝 Contributing

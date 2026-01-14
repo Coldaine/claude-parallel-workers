@@ -44,7 +44,7 @@ cd claude-parallel-hooks
 
 2. Install dependencies:
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 3. Install hooks in Claude Code settings:
